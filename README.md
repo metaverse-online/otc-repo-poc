@@ -9,6 +9,30 @@
 
 ---
 
+## Quick Start
+
+Before running the application, you need to install the local package and its dependencies. The setup script handles the environment preparation.
+
+Open your terminal in the project root and run:
+
+```bash
+pip install -e .
+```
+
+(Note: the `-e .` flag installs the package in editable mode, which is required for the local CLI tools to function correctly.)
+
+Once the installation completes, you can start the server:
+
+```bash
+make run
+# or
+python run.py
+```
+
+The app will be available at `http://127.0.0.1:5055`.
+
+---
+
 ## Table of contents
 
 1. [Overview](#1-overview)
