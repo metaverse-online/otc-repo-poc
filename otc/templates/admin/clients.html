@@ -1,0 +1,137 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block content %}
+<section class="card">
+  <div class="card-head">
+    <div>
+      <div class="card-title">Counterparties</div>
+      <div class="card-sub">KYC status, limits and risk posture</div>
+    </div>
+    <span class="chip">{{ clients | length }} client{{ 's' if clients | length != 1 }}</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Client</th><th>KYC</th><th class="right">Monthly limit</th><th>Utilisation</th>
+            <th class="right">Deals</th><th>Risk</th><th class="right">Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for c in clients %}
+        <tr>
+          <td>
+            <div class="row" style="gap:10px">
+              {{ ui.avatar(c.full_name) }}
+              <div style="min-width:0">
+                <div class="small strong truncate">{{ c.company or c.full_name }}</div>
+                <div class="tiny mute truncate">{{ c.full_name }} · {{ c.email }}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="badge" data-tone="{{ 'success' if c.kyc_status == 'verified' else ('warn' if c.kyc_status == 'pending' else 'danger') }}">{{ c.kyc_status }}</span>
+            {% if not c.is_active_user %}<span class="badge" data-tone="neutral">disabled</span>{% endif %}
+          </td>
+          <td class="right">
+            <form method="post" action="{{ url_for('admin.client_action', user_id=c.id) }}" class="row" style="justify-content:flex-end;gap:6px">
+              {{ ui.csrf_field() }}
+              <input type="hidden" name="action" value="limit">
+              <input class="input num" name="monthly_limit_ngn" value="{{ '{:.0f}'.format(c.monthly_limit_ngn) }}"
+                     style="width:120px;padding:5px 8px;font-size:12px;text-align:right">
+              <button class="btn btn-sm" type="submit">Set</button>
+            </form>
+          </td>
+          <td style="min-width:150px">
+            {% set used = exposure.get(c.id, 0) %}
+            {% set limit = c.monthly_limit_ngn or 1 %}
+            {% set pct = (used / limit * 100) %}
+            <div class="row-between tiny mute" style="margin-bottom:4px">
+              <span>{{ used | ngn(True) }}</span>
+              <span>{{ pct | round(1) }}%</span>
+            </div>
+            <div style="height:5px;border-radius:999px;background:#0a0f15;border:1px solid var(--line);overflow:hidden">
+              <div style="height:100%;width:{{ 100 if pct > 100 else pct }}%;background:{{ 'var(--red)' if pct > 85 else 'var(--gold)' }}"></div>
+            </div>
+          </td>
+          <td class="right num small">{{ deal_counts.get(c.id, 0) }}</td>
+          <td>
+            {% if c.risk_flag %}
+              <span class="badge" data-tone="danger">flagged</span>
+            {% else %}
+              <span class="badge" data-tone="neutral">clear</span>
+            {% endif %}
+          </td>
+          <td class="right">
+            <div class="row" style="justify-content:flex-end;gap:4px">
+              <form method="post" action="{{ url_for('admin.client_action', user_id=c.id) }}">
+                {{ ui.csrf_field() }}
+                {% if c.kyc_status == 'verified' %}
+                  <input type="hidden" name="action" value="kyc_reject">
+                  <button class="btn btn-sm btn-ghost" type="submit" title="Revoke KYC">Revoke</button>
+                {% else %}
+                  <input type="hidden" name="action" value="kyc_verify">
+                  <button class="btn btn-sm btn-primary" type="submit">Verify KYC</button>
+                {% endif %}
+              </form>
+              <form method="post" action="{{ url_for('admin.client_action', user_id=c.id) }}">
+                {{ ui.csrf_field() }}
+                <input type="hidden" name="action" value="toggle_risk">
+                <button class="btn btn-sm btn-ghost" type="submit" title="Toggle risk flag">{{ ui.icon('alert') }}</button>
+              </form>
+              <form method="post" action="{{ url_for('admin.client_action', user_id=c.id) }}">
+                {{ ui.csrf_field() }}
+                <input type="hidden" name="action" value="toggle_active">
+                <button class="btn btn-sm btn-ghost" type="submit" title="Enable / disable">{{ ui.icon('lock') }}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card mt-3">
+  <div class="card-head">
+    <div>
+      <div class="card-title">Wallet whitelist requests</div>
+      <div class="card-sub">Approve before an address can receive payouts</div>
+    </div>
+    {% if pending_wallets %}<span class="badge" data-tone="warn">{{ pending_wallets | length }} pending</span>{% endif %}
+  </div>
+  {% if pending_wallets %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Client</th><th>Network</th><th>Address</th><th>Label</th><th class="right">Requested</th><th class="right">Decision</th></tr></thead>
+      <tbody>
+        {% for w in pending_wallets %}
+        <tr>
+          <td class="small">{{ w.owner.company or w.owner.full_name }}</td>
+          <td class="small">{{ networks.get(w.network, {}).get('short', w.network) }}</td>
+          <td class="mono small truncate" style="max-width:300px">{{ w.address }}</td>
+          <td class="small dim">{{ w.label or '—' }}</td>
+          <td class="right small mute nowrap">{{ w.created_at | ago }}</td>
+          <td class="right">
+            <form method="post" action="{{ url_for('admin.wallet_action', wallet_id=w.id) }}" style="display:inline">
+              {{ ui.csrf_field() }}
+              <input type="hidden" name="action" value="approve">
+              <button class="btn btn-sm btn-primary" type="submit">Whitelist</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.wallet_action', wallet_id=w.id) }}" style="display:inline">
+              {{ ui.csrf_field() }}
+              <input type="hidden" name="action" value="revoke">
+              <button class="btn btn-sm btn-ghost" type="submit">Reject</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ ui.empty_state('No pending requests', 'Every submitted address has been reviewed.', 'check') }}
+  {% endif %}
+</section>
+{% endblock %}

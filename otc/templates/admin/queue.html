@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block content %}
+<div class="row-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px">
+  <div class="tabs">
+    <a class="tab {{ 'active' if tab == 'action' }}" href="{{ url_for('admin.queue', tab='action') }}">Needs approval <span class="count">{{ counts.action }}</span></a>
+    <a class="tab {{ 'active' if tab == 'flight' }}" href="{{ url_for('admin.queue', tab='flight') }}">In flight <span class="count">{{ counts.flight }}</span></a>
+    <a class="tab {{ 'active' if tab == 'disputes' }}" href="{{ url_for('admin.queue', tab='disputes') }}">Disputes <span class="count">{{ counts.disputes }}</span></a>
+  </div>
+  <span class="small mute">{{ deals | length }} deal{{ 's' if deals | length != 1 }} in this view</span>
+</div>
+
+<section class="card">
+  {% if deals %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Deal</th><th>Initiator</th><th>Counterparty</th><th>Asset</th>
+          <th class="right">Crypto</th><th class="right">NGN</th><th>Status</th>
+          <th class="right">Waiting</th><th class="right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in deals %}
+        <tr>
+          <td><a class="ref" href="{{ url_for('portal.deal_detail', deal_id=d.id) }}">{{ d.ref }}</a>
+            <span class="sub">{{ networks[d.network].short }} · {{ d.confirmations_seen }}/{{ d.confirmations_required }} conf.</span>
+          </td>
+          <td class="small">{{ d.initiator.company or d.initiator.full_name }}</td>
+          <td class="small dim">{{ d.counterparty_label() }}</td>
+          <td class="small strong">{{ d.asset }}</td>
+          <td class="right amount">{{ d.amount_crypto | crypto(d.asset) }}</td>
+          <td class="right amount">{{ d.fiat_amount | ngn }}</td>
+          <td>{{ ui.badge(d.status) }}</td>
+          <td class="right small mute nowrap">{{ d.updated_at | ago }}</td>
+          <td class="right">
+            <a class="btn btn-sm {{ 'btn-primary' if d.status in ('AGREED', 'CRYPTO_CONFIRMED') else '' }}" href="{{ url_for('portal.deal_detail', deal_id=d.id) }}">
+              {% if d.status == 'AGREED' %}Instructions
+              {% elif d.status == 'CRYPTO_CONFIRMED' %}Release NGN
+              {% elif d.status == 'DISPUTED' %}Resolve
+              {% else %}Open{% endif %}
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ ui.empty_state('Queue is clear', 'No deals in this stage right now.', 'check') }}
+  {% endif %}
+</section>
+
+<div class="banner banner-info mt-3">
+  {{ ui.icon('shield') }}
+  <div>
+    <strong>Release guard.</strong>
+    The interface refuses to move a deal to <span class="mono">FIAT_SENT</span> unless its status is
+    <span class="mono">CRYPTO_CONFIRMED</span> at the time of the action.
+  </div>
+</div>
+{% endblock %}

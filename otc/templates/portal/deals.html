@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block topbar_actions %}
+  <a class="btn btn-primary" href="{{ url_for('portal.deal_new') }}">{{ ui.icon('plus') }} New deal</a>
+{% endblock %}
+
+{% block content %}
+<div class="row-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px">
+  <div class="tabs">
+    <a class="tab {{ 'active' if not active_status }}" href="{{ url_for('portal.deals') }}">All</a>
+    {% for value, label in statuses %}
+      <a class="tab {{ 'active' if active_status == value }}" href="{{ url_for('portal.deals', status=value) }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <span class="small mute">{{ deals | length }} deal{{ 's' if deals | length != 1 }}</span>
+</div>
+
+<section class="card">
+  {% if deals %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Deal</th><th>Direction</th><th>Network</th>
+          <th class="right">Crypto</th><th class="right">Rate</th><th class="right">NGN</th>
+          <th>Status</th><th class="right">Updated</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in deals %}
+        <tr>
+          <td>
+            <a class="ref" href="{{ url_for('portal.deal_detail', deal_id=d.id) }}">{{ d.ref }}</a>
+            <span class="sub">{{ d.created_at | dt }}</span>
+          </td>
+          <td>
+            <span class="small">{{ 'Sell crypto' if d.side == 'SELL_CRYPTO' else 'Buy crypto' }}</span>
+            <span class="sub">{{ d.counterparty_label() }}</span>
+          </td>
+          <td class="nowrap"><span class="small">{{ networks[d.network].label }}</span><span class="sub">{{ networks[d.network].required_conf }} conf.</span></td>
+          <td class="right amount">{{ d.amount_crypto | crypto(d.asset) }}</td>
+          <td class="right num small dim">{{ '{:,.2f}'.format(d.rate_ngn) }}</td>
+          <td class="right amount">{{ d.fiat_amount | ngn }}</td>
+          <td>{{ ui.badge(d.status) }}</td>
+          <td class="right small mute nowrap">{{ d.updated_at | ago }}</td>
+          <td class="right"><a class="icon-btn" href="{{ url_for('portal.deal_detail', deal_id=d.id) }}">{{ ui.icon('chevron') }}</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ ui.empty_state('Nothing here', 'No deals match this filter.', 'layers') }}
+  {% endif %}
+</section>
+{% endblock %}

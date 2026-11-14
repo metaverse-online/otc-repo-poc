@@ -1,0 +1,80 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block topbar_actions %}
+  <a class="btn btn-sm btn-ghost" href="{{ url_for('portal.deal_detail', deal_id=deal.id) }}">{{ ui.icon('chevron') }} Back to deal</a>
+  <a class="btn btn-sm" href="#" onclick="window.print();return false;">{{ ui.icon('printer') }} Print / PDF</a>
+{% endblock %}
+
+{% block content %}
+<div class="receipt-page" style="margin-top:0">
+  <div class="receipt">
+    <div class="receipt-head">
+      <div>
+        <div class="row" style="gap:10px">
+          <span class="brand-mark" style="width:30px;height:30px;border-radius:9px">{{ ui.icon('chain') }}</span>
+          <div>
+            <div class="receipt-title">{{ brand }}</div>
+            <div class="tiny mute">Private OTC settlement · {{ env_name }}</div>
+          </div>
+        </div>
+        <p class="small mute mt-2" style="max-width:34ch">
+          Settlement receipt issued for the deal below. The fiat leg was released only after
+          the crypto leg reached the required confirmation depth.
+        </p>
+      </div>
+      <div class="right">
+        <div class="kicker">Receipt</div>
+        <div class="mono strong">{{ deal.ref }}</div>
+        <div class="tiny mute mt-1">{{ (deal.settled_at or deal.updated_at) | dt('%d %B %Y · %H:%M') }} UTC</div>
+        {{ ui.badge(deal.status) }}
+      </div>
+    </div>
+
+    <div class="grid grid-2 mt-3" style="gap:20px">
+      <div>
+        <div class="kicker">Counterparty</div>
+        <div class="strong">{{ deal.initiator.company or deal.initiator.full_name }}</div>
+        <div class="small mute">{{ deal.initiator.full_name }}</div>
+        <div class="small mute">{{ deal.initiator.email }}</div>
+      </div>
+      <div>
+        <div class="kicker">Counterparty</div>
+        <div class="strong">{{ deal.counterparty_label() }}</div>
+        <div class="small mute">{{ deal.counterparty.full_name if deal.counterparty else 'Desk principal' }}</div>
+        <div class="small mute">{{ deal.counterparty.email if deal.counterparty else 'settlements@otcdesk.test' }}</div>
+      </div>
+    </div>
+
+    <div class="receipt-rows">
+      <div class="receipt-row"><span>Asset / network</span><strong>{{ deal.asset }} · {{ networks[deal.network].label }}</strong></div>
+      <div class="receipt-row"><span>Crypto leg</span><strong>{{ deal.amount_crypto | crypto(deal.asset) }}</strong></div>
+      <div class="receipt-row"><span>Rate</span><strong>{{ '{:,.2f}'.format(deal.rate_ngn) }} NGN / {{ deal.asset }}</strong></div>
+      <div class="receipt-row"><span>Gross consideration</span><strong>{{ deal.fiat_amount | ngn }}</strong></div>
+      <div class="receipt-row"><span>Desk fee</span><strong>{{ deal.fee_ngn | ngn }}</strong></div>
+      <div class="receipt-row"><span>Net settlement</span><strong>{{ (deal.fiat_amount - deal.fee_ngn) | ngn }}</strong></div>
+      <div class="receipt-row"><span>Fiat rail / reference</span><strong>{{ fiat_methods.get(deal.fiat_method, deal.fiat_method) }} · {{ deal.fiat_reference or '—' }}</strong></div>
+      <div class="receipt-row"><span>Beneficiary</span><strong>{{ deal.payout_bank or '—' }}</strong></div>
+      <div class="receipt-row">
+        <span>On-chain transaction</span>
+        <strong class="mono" style="font-size:11px;max-width:52ch;overflow-wrap:anywhere">{{ deal.txid or '—' }}</strong>
+      </div>
+      <div class="receipt-row"><span>Confirmations at release</span><strong>{{ deal.confirmations_seen }} / {{ deal.confirmations_required }}</strong></div>
+      <div class="receipt-row"><span>Verification provider</span><strong>{{ deal.checks[0].provider if deal.checks else '—' }}{% if deal.checks and deal.checks[0].simulated %} (simulated){% endif %}</strong></div>
+    </div>
+
+    <div class="receipt-total">
+      <div>
+        <div class="kicker" style="margin:0">Total settled</div>
+        <div class="tiny mute">NGN, net of desk fees</div>
+      </div>
+      <strong>{{ (deal.fiat_amount - deal.fee_ngn) | ngn }}</strong>
+    </div>
+
+    <p class="tiny mute mt-3">
+      Proof of concept document generated from the platform's own records. It is not a bank
+      confirmation, a tax document, or legal evidence of payment. All timestamps UTC.
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block content %}
+<div class="row-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px">
+  <form class="row" method="get" action="{{ url_for('admin.audit_log') }}" style="gap:8px">
+    <select class="select" name="entity" style="width:190px">
+      <option value="">All entities</option>
+      {% for e in entities %}
+        <option value="{{ e }}" {{ 'selected' if entity == e }}>{{ e }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sm" type="submit">{{ ui.icon('search') }} Filter</button>
+  </form>
+  <span class="small mute">{{ entries | length }} entries · newest 300 · append-only</span>
+</div>
+
+<section class="card">
+  {% if entries %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Timestamp (UTC)</th><th>Actor</th><th>Action</th><th>Entity</th><th>Context</th><th>IP</th></tr></thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td class="small mute nowrap mono">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td class="small">{{ e.actor_email or 'system' }}</td>
+          <td class="small"><span class="mono" style="color:var(--gold-2)">{{ e.action }}</span></td>
+          <td class="small dim">{{ e.entity }}{% if e.entity_id %} <span class="mute">#{{ e.entity_id }}</span>{% endif %}</td>
+          <td class="small mute truncate" style="max-width:380px">
+            {% if e.meta %}<span class="mono tiny">{{ e.meta }}</span>{% else %}—{% endif %}
+          </td>
+          <td class="small mute mono">{{ e.ip or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ ui.empty_state('Nothing logged', 'Actions will appear here as soon as someone touches a record.', 'list') }}
+  {% endif %}
+</section>
+{% endblock %}

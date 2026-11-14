@@ -1,0 +1,105 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block content %}
+<div class="split">
+  <div class="stack">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Verification console</div>
+          <div class="card-sub">Run a provider lookup against any open deal</div>
+        </div>
+        {% if chain_demo %}
+          <span class="chip chip-demo"><span class="dot"></span> simulated provider</span>
+        {% else %}
+          <span class="chip chip-live"><span class="dot"></span> live providers</span>
+        {% endif %}
+      </div>
+      <form class="card-body" method="post" action="{{ url_for('admin.verify_run') }}">
+        {{ ui.csrf_field() }}
+        <div class="form-grid">
+          <div class="field span-2">
+            <label class="label" for="deal_id">Deal</label>
+            <select class="select" id="deal_id" name="deal_id" required>
+              {% for d in open_deals %}
+                <option value="{{ d.id }}">{{ d.ref }} · {{ d.initiator.company or d.initiator.full_name }} · {{ d.amount_crypto | crypto(d.asset) }} · {{ d.status }}</option>
+              {% endfor %}
+            </select>
+            {% if not open_deals %}<span class="hint">No deal is currently awaiting verification.</span>{% endif %}
+          </div>
+          <div class="field span-2">
+            <label class="label" for="txid">Transaction hash</label>
+            <input class="input mono" id="txid" name="txid" placeholder="Paste the full txid" required style="font-size:12px">
+          </div>
+        </div>
+        <div class="row-between mt-3">
+          <span class="hint">Confirmations, destination and amount are checked against the deal record.</span>
+          <button class="btn btn-primary" type="submit" {{ 'disabled' if not open_deals }}>{{ ui.icon('shield') }} Run check</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Recent checks</div>
+          <div class="card-sub">Append-only verification history</div>
+        </div>
+        <span class="chip">{{ checks | length }} latest</span>
+      </div>
+      {% if checks %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>When</th><th>Deal</th><th>Result</th><th>Detail</th></tr></thead>
+          <tbody>
+            {% for c in checks %}
+            <tr>
+              <td class="small mute nowrap">
+                {{ c.checked_at | dt('%d %b · %H:%M') }}
+                <span class="sub">{{ c.provider }}{% if c.simulated %} · sim{% endif %}</span>
+              </td>
+              <td><a class="ref" href="{{ url_for('portal.deal_detail', deal_id=c.deal_id) }}">{{ c.deal.ref if c.deal else c.deal_id }}</a></td>
+              <td class="nowrap">
+                <span class="badge" data-tone="{{ 'success' if c.status == 'confirmed' else ('warn' if c.status in ('pending','not_found') else 'danger') }}">{{ c.status }}</span>
+                <span class="sub">{{ c.confirmations }} / {{ c.required_conf }} conf.</span>
+              </td>
+              <td class="small mute" style="white-space:normal">{{ c.detail }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {{ ui.empty_state('No checks yet', 'Every verification attempt will be listed here.', 'shield') }}
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Desk settlement wallets</div>
+        <div class="card-sub">Deposit addresses published to counterparties</div>
+      </div>
+    </div>
+    <form class="card-body" method="post" action="{{ url_for('admin.wallets_save') }}">
+      {{ ui.csrf_field() }}
+      <div class="stack">
+        {% for key, meta in networks.items() %}
+          {% set w = wallets.get(key) %}
+          <div class="field">
+            <label class="label" for="address_{{ key }}">{{ meta.label }}</label>
+            <input class="input mono" id="address_{{ key }}" name="address_{{ key }}"
+                   value="{{ w.address if w else '' }}" placeholder="{{ meta.address_hint }}" style="font-size:12px">
+            <input class="input" name="label_{{ key }}" value="{{ w.label if w else 'Desk treasury' }}"
+                   placeholder="Label" style="font-size:12px">
+          </div>
+        {% endfor %}
+        <button class="btn btn-block" type="submit">{{ ui.icon('check') }} Save wallet set</button>
+        <p class="hint">Changing a desk address only affects deals created after the change. Existing deals keep their snapshot.</p>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

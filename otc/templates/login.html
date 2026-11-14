@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+
+{% block title %}Sign in · {{ brand }}{% endblock %}
+
+{% block body %}
+<div class="auth">
+  <aside class="auth-aside">
+    <div>
+      <div class="brand" style="padding:0">
+        <span class="brand-mark">{{ ui.icon('chain') }}</span>
+        <span class="brand-text">
+          <strong>{{ brand }}</strong>
+          <span>Private settlement desk</span>
+        </span>
+      </div>
+
+      <h2 class="auth-headline" style="margin-top:56px">
+        Naira settles <em>after</em> the chain agrees.
+      </h2>
+      <p class="auth-sub">
+        A deal-based OTC workflow for BTC and USDT: terms are agreed between counterparties,
+        the crypto leg is verified on-chain, and the fiat leg is only released by the desk
+        once the required confirmations land.
+      </p>
+
+      <div class="ticker" aria-hidden="true">
+        <div class="ticker-row">
+          <span class="pair"><span class="coin btc">₿</span> BTC / NGN</span>
+          <span><span class="val">152,450,000</span><span class="delta">2 conf.</span></span>
+        </div>
+        <div class="ticker-row">
+          <span class="pair"><span class="coin usdt">₮</span> USDT / NGN</span>
+          <span><span class="val">1,542.00</span><span class="delta">19 conf.</span></span>
+        </div>
+        <div class="ticker-row">
+          <span class="pair"><span class="coin usdt">₮</span> USDT ERC-20 / BEP-20</span>
+          <span><span class="val">12 / 15 conf.</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row small mute" style="gap:14px;flex-wrap:wrap">
+      <span>BTC mainnet</span><span>·</span><span>TRC-20</span><span>·</span><span>ERC-20</span><span>·</span><span>BEP-20</span>
+    </div>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <p class="kicker">{{ env_name }} · access</p>
+      <h1>Sign in to the desk</h1>
+      <p class="sub">Counterparty portal &amp; settlement operations console.</p>
+
+      <form class="auth-form" method="post" action="{{ url_for('auth.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="field">
+          <label class="label" for="email">Email</label>
+          <input class="input" id="email" name="email" type="email" autocomplete="username"
+                 value="{{ email or '' }}" placeholder="you@desk.co" required autofocus>
+        </div>
+
+        <div class="field">
+          <label class="label" for="password">Password</label>
+          <input class="input" id="password" name="password" type="password"
+                 autocomplete="current-password" placeholder="••••••••" required>
+        </div>
+
+        <button class="btn btn-primary btn-block" type="submit">
+          {{ ui.icon('lock') }} Enter the desk
+        </button>
+      </form>
+
+      <div class="demo-box">
+        <strong>Demo accounts (POC)</strong>
+        <table>
+          <tr><td>admin@otcdesk.test</td><td>Admin#2026</td></tr>
+          <tr><td>ops@otcdesk.test</td><td>Ops#2026</td></tr>
+          <tr><td>trading@northwind.test</td><td>Client#2026</td></tr>
+          <tr><td>treasury@helios.test</td><td>Client#2026</td></tr>
+        </table>
+      </div>
+
+      <p class="tiny mute mt-3">
+        Proof of concept — seeded data, simulated chain provider. Replace the credentials and
+        enable a live provider before any real use.
+      </p>
+    </div>
+  </main>
+</div>
+{% endblock %}

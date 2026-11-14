@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+
+{% block body %}
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{{ url_for('home') }}">
+      <span class="brand-mark">{{ ui.icon('chain') }}</span>
+      <span class="brand-text">
+        <strong>{{ brand }}</strong>
+        <span>Private settlement</span>
+      </span>
+    </a>
+
+    <nav class="nav">
+      {% if current_user.is_admin %}
+        <p class="nav-label">Desk</p>
+        <a class="nav-item {{ 'active' if request.endpoint == 'admin.overview' }}" href="{{ url_for('admin.overview') }}">
+          {{ ui.icon('grid') }} Overview
+        </a>
+        <a class="nav-item {{ 'active' if request.endpoint == 'admin.queue' }}" href="{{ url_for('admin.queue') }}">
+          {{ ui.icon('layers') }} Deal queue
+          {% if admin_queue_count %}<span class="nav-count">{{ admin_queue_count }}</span>{% endif %}
+        </a>
+        <a class="nav-item {{ 'active' if request.endpoint in ('admin.verify', 'admin.verify_run', 'admin.wallets_save') }}" href="{{ url_for('admin.verify') }}">
+          {{ ui.icon('shield') }} On-chain
+        </a>
+
+        <p class="nav-label">Operations</p>
+        <a class="nav-item {{ 'active' if request.endpoint in ('admin.clients', 'admin.client_action', 'admin.wallet_action') }}" href="{{ url_for('admin.clients') }}">
+          {{ ui.icon('users') }} Clients
+          {% if admin_kyc_count %}<span class="nav-count">{{ admin_kyc_count }}</span>{% endif %}
+        </a>
+        <a class="nav-item {{ 'active' if request.endpoint == 'admin.audit_log' }}" href="{{ url_for('admin.audit_log') }}">
+          {{ ui.icon('list') }} Audit log
+        </a>
+      {% else %}
+        <p class="nav-label">Counterparty</p>
+        <a class="nav-item {{ 'active' if request.endpoint == 'portal.overview' }}" href="{{ url_for('portal.overview') }}">
+          {{ ui.icon('grid') }} Overview
+        </a>
+        <a class="nav-item {{ 'active' if request.endpoint == 'portal.deal_new' }}" href="{{ url_for('portal.deal_new') }}">
+          {{ ui.icon('plus') }} New deal
+        </a>
+        <a class="nav-item {{ 'active' if request.endpoint in ('portal.deals', 'portal.deal_detail') }}" href="{{ url_for('portal.deals') }}">
+          {{ ui.icon('layers') }} Deals
+        </a>
+
+        <p class="nav-label">Records</p>
+        <a class="nav-item {{ 'active' if request.endpoint == 'portal.wallets' }}" href="{{ url_for('portal.wallets') }}">
+          {{ ui.icon('wallet') }} Wallets
+        </a>
+        <a class="nav-item {{ 'active' if request.endpoint in ('portal.statements', 'portal.statements_csv', 'portal.deal_receipt') }}" href="{{ url_for('portal.statements') }}">
+          {{ ui.icon('file') }} Statements
+        </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-foot">
+      {{ ui.avatar(current_user.full_name) }}
+      <div class="user-chip grow">
+        <strong class="truncate">{{ current_user.full_name }}</strong>
+        <span class="truncate">{{ 'Desk operator' if current_user.is_admin else (current_user.company or 'Counterparty') }}</span>
+      </div>
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        {{ ui.csrf_field() }}
+        <button class="icon-btn" type="submit" title="Sign out" aria-label="Sign out">{{ ui.icon('logout') }}</button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="row" style="gap:12px">
+        <button class="icon-btn menu-btn" id="menu-toggle" type="button" aria-label="Menu">{{ ui.icon('menu') }}</button>
+        <div>
+          <p class="kicker">{{ page_kicker|default('') }}</p>
+          <h1>{{ page_title|default('Desk') }}</h1>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        {% if chain_demo %}
+          <span class="chip chip-demo" title="The verification engine is running in deterministic demo mode"><span class="dot"></span> Chain · simulated</span>
+        {% else %}
+          <span class="chip chip-live" title="Live blockchain providers are enabled"><span class="dot"></span> Chain · live</span>
+        {% endif %}
+        {% block topbar_actions %}{% endblock %}
+      </div>
+    </header>
+
+    <main class="content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flashes">
+            {% for category, message in messages %}
+              <div class="banner banner-{{ 'danger' if category == 'danger' else ('warn' if category == 'warn' else ('success' if category == 'success' else 'info')) }}">
+                {{ ui.icon('alert' if category in ('danger', 'warn') else 'check') }}
+                <div>{{ message }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}

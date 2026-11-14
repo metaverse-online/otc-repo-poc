@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block content %}
+<div class="split">
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Settlement addresses</div>
+        <div class="card-sub">Only whitelisted addresses should ever receive a payout</div>
+      </div>
+      <span class="chip">{{ wallets | length }} on file</span>
+    </div>
+
+    {% if wallets %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Network</th><th>Address</th><th>Label</th><th>Status</th><th class="right">Added</th><th></th></tr></thead>
+        <tbody>
+          {% for w in wallets %}
+          <tr>
+            <td><span class="strong small">{{ networks.get(w.network, {}).get('short', w.network) }}</span><span class="sub">{{ networks.get(w.network, {}).get('label', '') }}</span></td>
+            <td><span class="mono small truncate" style="max-width:280px;display:inline-block">{{ w.address }}</span></td>
+            <td class="small dim">{{ w.label or '—' }}</td>
+            <td>
+              {% if w.whitelisted %}
+                <span class="badge" data-tone="success">whitelisted</span>
+              {% else %}
+                <span class="badge" data-tone="warn">pending</span>
+              {% endif %}
+            </td>
+            <td class="right small mute nowrap">{{ w.created_at | ago }}</td>
+            <td class="right">
+              {% if not w.whitelisted %}
+              <form method="post" action="{{ url_for('portal.wallet_delete', wallet_id=w.id) }}">
+                {{ ui.csrf_field() }}
+                <button class="icon-btn" type="submit" title="Remove request">{{ ui.icon('x') }}</button>
+              </form>
+              {% else %}
+              <span class="icon-btn" title="Locked">{{ ui.icon('lock') }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ ui.empty_state('No addresses', 'Add your first settlement wallet to speed up payouts.', 'wallet') }}
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Add an address</div>
+        <div class="card-sub">Reviewed by the desk before whitelisting</div>
+      </div>
+    </div>
+    <form class="card-body" method="post" action="{{ url_for('portal.wallets') }}">
+      {{ ui.csrf_field() }}
+      <div class="stack">
+        <div class="field">
+          <label class="label" for="network">Network</label>
+          <select class="select" id="network" name="network">
+            {% for key, meta in networks.items() %}
+              <option value="{{ key }}">{{ meta.label }} ({{ meta.address_hint }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="address">Address</label>
+          <input class="input mono" id="address" name="address" placeholder="Full address" required minlength="20">
+        </div>
+        <div class="field">
+          <label class="label" for="label">Label</label>
+          <input class="input" id="label" name="label" placeholder="e.g. Treasury cold wallet">
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">{{ ui.icon('plus') }} Submit for whitelisting</button>
+        <p class="hint">A new address stays inactive until the desk approves it. Payouts to non-whitelisted addresses are blocked.</p>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,388 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block topbar_actions %}
+  <a class="btn btn-sm btn-ghost" href="{{ url_for('portal.deals') }}">{{ ui.icon('chevron') }} All deals</a>
+{% endblock %}
+
+{% block content %}
+<span id="deal-live" data-deal-id="{{ deal.id }}" data-status="{{ deal.status }}" hidden></span>
+{% set cur = status_meta.get(deal.status, {}).get('step', 0) %}
+{% set steps = [('Terms', 1), ('Agreed', 2), ('Instructions', 3), ('Deposit', 4), ('Confirmed', 5), ('Fiat', 6)] %}
+
+<section class="card" style="margin-bottom:18px">
+  <div class="card-body">
+    <div class="deal-hero">
+      <div>
+        <div class="row" style="gap:10px;flex-wrap:wrap">
+          <span class="kicker" style="margin:0">{{ deal.ref }}</span>
+          {{ ui.badge(deal.status) }}
+          {% if deal.status == 'DISPUTED' %}<span class="tag" style="color:var(--red);border-color:rgba(242,112,127,.3)">dispute</span>{% endif %}
+          {% if chain_demo %}<span class="tag tag-sim">simulated chain</span>{% endif %}
+        </div>
+        <div class="mt-2">
+          <div class="deal-amount">{{ deal.amount_crypto | crypto(deal.asset) }}<small> · {{ deal.fiat_amount | ngn }}</small></div>
+          <p class="small mute mt-1">
+            {{ networks[deal.network].label }} · {{ fiat_methods.get(deal.fiat_method, deal.fiat_method) }}
+            · opened {{ deal.created_at | dt }}
+          </p>
+        </div>
+      </div>
+      <div class="deal-meta">
+        <div><span>Rate</span><strong class="num">{{ '{:,.2f}'.format(deal.rate_ngn) }} NGN</strong></div>
+        <div><span>Confirmations</span><strong class="num">{{ deal.confirmations_seen }} / {{ deal.confirmations_required }}</strong></div>
+        <div><span>Fee</span><strong class="num">{{ deal.fee_ngn | ngn }}</strong></div>
+        <div><span>Payout</span><strong>{{ deal.initiator.company or deal.initiator.full_name }}</strong></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="steps">
+      {% for label, t in steps %}
+        <div class="step {{ 'done' if (cur > t or cur >= 7) else ('current' if cur == t) }}">
+          <div class="step-dot">{{ loop.index }}</div>
+          {% if not loop.last %}<div class="step-line"></div>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="step-labels">
+      {% for label, t in steps %}
+        <span class="{{ 'done' if (cur > t or cur >= 7) else ('current' if cur == t) }}">{{ label }}</span>
+      {% endfor %}
+    </div>
+
+    {% if deal.status == 'DISPUTED' and deal.dispute_reason %}
+      <div class="banner banner-danger mt-3">
+        {{ ui.icon('alert') }}
+        <div><strong>Dispute open.</strong> {{ deal.dispute_reason }}</div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<div class="split">
+  <div class="stack">
+    <!-- on-chain verification ----------------------------------------- -->
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">On-chain verification</div>
+          <div class="card-sub">Deposit matched against the deal's settlement address</div>
+        </div>
+        {% if last_check %}
+          {% if last_check.simulated %}<span class="tag tag-sim">simulated</span>{% else %}<span class="tag">{{ last_check.provider }}</span>{% endif %}
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <div class="form-grid" style="gap:18px">
+          <div class="field">
+            <span class="label">Deposit address</span>
+            {{ ui.addr(deal.deposit_address) }}
+          </div>
+          <div class="field">
+            <span class="label">Transaction</span>
+            {% if deal.txid %}
+              <div class="addr" data-copy="{{ deal.txid }}">
+                <code>{{ deal.txid }}</code>
+                {% if deal.explorer_url %}
+                  <a class="icon-btn js-copy" style="margin-left:auto;width:26px;height:26px" href="{{ deal.explorer_url }}" target="_blank" rel="noopener" title="Open in explorer">{{ ui.icon('arrow-up-right') }}</a>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="addr"><code>Awaiting txid</code></div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <div class="row-between small">
+            <span class="mute">Confirmation depth</span>
+            <span class="num">{{ deal.confirmations_seen }} of {{ deal.confirmations_required }} required</span>
+          </div>
+          {% set pct = ((deal.confirmations_seen / deal.confirmations_required * 100) if deal.confirmations_required else 0) %}
+          <div style="height:6px;border-radius:999px;background:#0a0f15;border:1px solid var(--line);margin-top:8px;overflow:hidden">
+            <div style="height:100%;width:{{ 100 if pct > 100 else pct }}%;background:linear-gradient(90deg,rgba(233,185,73,.7),{{ 'var(--teal)' if pct >= 100 else 'var(--gold)' }});transition:width .4s ease"></div>
+          </div>
+        </div>
+
+        {% if last_check %}
+          <div class="mt-3">
+            <div class="banner {{ 'banner-success' if last_check.ok else ('banner-warn' if last_check.status in ('pending', 'not_found') else 'banner-danger') }}">
+              {{ ui.icon('check' if last_check.ok else 'alert') }}
+              <div>
+                <strong>{{ last_check.status | replace('_', ' ') | title }}</strong> — {{ last_check.detail }}
+                <div class="tiny mute mt-1">
+                  checked {{ last_check.checked_at | dt }} · provider {{ last_check.provider }}
+                  {% if last_check.simulated %}· <span style="color:var(--gold-2)">simulated result, not a real chain lookup</span>{% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if check_history %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Checked</th><th>Result</th><th class="right">Conf.</th><th>Provider</th><th>Detail</th></tr></thead>
+          <tbody>
+            {% for c in check_history %}
+            <tr>
+              <td class="small mute nowrap">{{ c.checked_at | dt('%d %b · %H:%M') }}</td>
+              <td>
+                <span class="badge" data-tone="{{ 'success' if c.status == 'confirmed' else ('warn' if c.status in ('pending', 'not_found') else 'danger') }}">{{ c.status }}</span>
+              </td>
+              <td class="right num small">{{ c.confirmations }}/{{ c.required_conf }}</td>
+              <td class="small mute">{{ c.provider }}{% if c.simulated %} <span class="tag tag-sim" style="margin-left:4px">sim</span>{% endif %}</td>
+              <td class="small mute truncate" style="max-width:280px">{{ c.detail }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- settlement instructions --------------------------------------- -->
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Settlement instructions</div>
+          <div class="card-sub">Both legs of the deal</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="grid grid-2" style="gap:18px">
+          <div>
+            <div class="kicker">{{ deal.asset }} leg · you send</div>
+            <p class="small mute mt-1" style="margin-bottom:10px">
+              Send exactly {{ deal.amount_crypto | crypto(deal.asset) }} on {{ networks[deal.network].label }}.
+              Any other network or address is a failed deal.
+            </p>
+            {{ ui.addr(deal.deposit_address) }}
+          </div>
+          <div>
+            <div class="kicker">NGN leg · desk sends</div>
+            <p class="small mute mt-1" style="margin-bottom:10px">
+              {{ fiat_methods.get(deal.fiat_method, deal.fiat_method) }} to the beneficiary below,
+              released after {{ deal.confirmations_required }} confirmations.
+            </p>
+            <div class="addr" style="font-family:var(--font);align-items:flex-start">
+              <code style="white-space:normal">{{ deal.payout_bank or 'Beneficiary details to be confirmed with the desk' }}</code>
+            </div>
+            {% if deal.payout_address %}
+              <div class="mt-2">{{ ui.addr(deal.payout_address) }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if deal.status in ('CRYPTO_CONFIRMED', 'FIAT_SENT', 'SETTLED') %}
+          <hr class="divider">
+          <div class="row-between wrap">
+            <div class="stat-inline">
+              <div><span>Fiat reference</span><strong class="mono">{{ deal.fiat_reference or '—' }}</strong></div>
+              {% if deal.receipt_file %}
+                <div><span>Proof</span><strong><a class="link" href="{{ url_for('portal.receipt_file', filename=deal.receipt_file) }}" target="_blank">receipt attached</a></strong></div>
+              {% endif %}
+              {% if deal.settled_at %}
+                <div><span>Settled</span><strong>{{ deal.settled_at | dt('%d %b %Y · %H:%M') }}</strong></div>
+              {% endif %}
+            </div>
+            {% if deal.fiat_reference %}
+              <a class="btn btn-sm" href="{{ url_for('portal.deal_receipt', deal_id=deal.id) }}">{{ ui.icon('printer') }} Receipt</a>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- thread --------------------------------------------------------- -->
+    <section class="card" id="thread">
+      <div class="card-head">
+        <div class="card-title">Deal thread</div>
+        <span class="small mute">{{ deal.messages | length }} message{{ 's' if deal.messages | length != 1 }}</span>
+      </div>
+      <div class="card-body">
+        <div class="thread">
+          {% for m in deal.messages %}
+            <div class="msg {{ 'mine' if m.author_id == current_user.id }}">
+              <div class="msg-avatar">{{ ui.initials(m.author.full_name) }}</div>
+              <div class="msg-body grow">
+                <div class="msg-head">
+                  <strong>{{ m.author.company or m.author.full_name }}</strong>
+                  {% if m.author.is_admin %}<span class="tag">desk</span>{% endif %}
+                  <time>{{ m.created_at | dt('%d %b · %H:%M') }}</time>
+                </div>
+                <div class="msg-text">{{ m.body }}</div>
+              </div>
+            </div>
+          {% else %}
+            <p class="small mute">No messages yet.</p>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="card-body tight" style="border-top:1px solid var(--line-soft)">
+        <form method="post" action="{{ url_for('portal.deal_message', deal_id=deal.id) }}" class="row" style="gap:10px">
+          {{ ui.csrf_field() }}
+          <input class="input grow" name="body" placeholder="Message the counterparty and the desk…" autocomplete="off" required>
+          <button class="btn btn-primary" type="submit">{{ ui.icon('send') }} Send</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <!-- side -------------------------------------------------------------- -->
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Terms</div></div>
+      <div class="card-body">
+        <div class="kv">
+          <div class="kv-row"><dt>Asset</dt><dd>{{ deal.asset }}</dd></div>
+          <div class="kv-row"><dt>Amount</dt><dd>{{ deal.amount_crypto | crypto(deal.asset) }}</dd></div>
+          <div class="kv-row"><dt>Rate</dt><dd>{{ '{:,.2f}'.format(deal.rate_ngn) }}</dd></div>
+          <div class="kv-sep"></div>
+          <div class="kv-row"><dt>Gross NGN</dt><dd class="strong">{{ deal.fiat_amount | ngn }}</dd></div>
+          <div class="kv-row"><dt>Desk fee</dt><dd>{{ deal.fee_ngn | ngn }}</dd></div>
+          <div class="kv-row"><dt>Net</dt><dd class="strong">{{ (deal.fiat_amount - deal.fee_ngn) | ngn }}</dd></div>
+          <div class="kv-sep"></div>
+          <div class="kv-row"><dt>Rail</dt><dd>{{ fiat_methods.get(deal.fiat_method, deal.fiat_method) }}</dd></div>
+          <div class="kv-row"><dt>Updated</dt><dd>{{ deal.updated_at | ago }}</dd></div>
+        </div>
+        {% if deal.notes %}
+          <hr class="divider">
+          <div class="kicker">Deal note</div>
+          <p class="small dim mt-1">{{ deal.notes }}</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Counterparties</div></div>
+      <div class="card-body tight">
+        <div class="stack" style="gap:14px">
+          <div class="row" style="gap:11px">
+            {{ ui.avatar(deal.initiator.full_name) }}
+            <div class="grow" style="min-width:0">
+              <div class="small strong truncate">{{ deal.initiator.company or deal.initiator.full_name }}</div>
+              <div class="tiny mute">{{ 'Initiator' if deal.initiator_id != current_user.id else 'Initiator (you)' }} · KYC {{ deal.initiator.kyc_status }}</div>
+            </div>
+          </div>
+          <div class="row" style="gap:11px">
+            {% if deal.counterparty %}
+              {{ ui.avatar(deal.counterparty.full_name) }}
+              <div class="grow" style="min-width:0">
+                <div class="small strong truncate">{{ deal.counterparty.company or deal.counterparty.full_name }}</div>
+                <div class="tiny mute">Counterparty · KYC {{ deal.counterparty.kyc_status }}</div>
+              </div>
+            {% else %}
+              <span class="avatar">{{ ui.icon('bank') }}</span>
+              <div class="grow" style="min-width:0">
+                <div class="small strong">Desk principal</div>
+                <div class="tiny mute">OTC Desk takes the other side</div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {% if actions %}
+    <section class="card">
+      <div class="card-head"><div class="card-title">Your actions</div></div>
+      <div class="card-body">
+        <div class="stack" style="gap:12px">
+          {% for a in actions %}
+            <form method="post" action="{{ url_for('portal.deal_action', deal_id=deal.id) }}">
+              {{ ui.csrf_field() }}
+              <input type="hidden" name="action" value="{{ a.action }}">
+              {% if a.action == 'submit_tx' %}
+                <label class="label" for="txid">Transaction hash</label>
+                <input class="input mono mt-1" id="txid" name="txid" placeholder="Full txid" required
+                       value="{{ deal.txid or '' }}" style="margin-bottom:10px;font-size:12px">
+              {% elif a.action == 'dispute' %}
+                <input class="input" name="reason" placeholder="Describe the issue" required style="margin-bottom:10px">
+              {% endif %}
+              <button class="btn {{ 'btn-primary' if a.tone == 'primary' else 'btn-ghost' }} btn-block" type="submit">
+                {{ a.label }}
+              </button>
+            </form>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if current_user.is_admin %}
+    <section class="card" style="border-color:rgba(233,185,73,.28)">
+      <div class="card-head" style="background:rgba(233,185,73,.05)">
+        <div class="card-title" style="color:var(--gold-2)">Desk actions</div>
+        <span class="tag tag-sim">admin</span>
+      </div>
+      <div class="card-body">
+        <div class="stack" style="gap:12px">
+
+          {% if deal.status == 'AGREED' %}
+          <form method="post" action="{{ url_for('admin.deal_action', deal_id=deal.id) }}">
+            {{ ui.csrf_field() }}
+            <input type="hidden" name="action" value="publish">
+            <input type="hidden" name="next" value="{{ url_for('portal.deal_detail', deal_id=deal.id) }}">
+            <button class="btn btn-primary btn-block" type="submit">{{ ui.icon('send') }} Publish instructions</button>
+            <p class="hint mt-1">Locks the deposit address and opens the crypto leg.</p>
+          </form>
+          {% endif %}
+
+          {% if deal.status == 'CRYPTO_CONFIRMED' %}
+          <form method="post" action="{{ url_for('admin.deal_action', deal_id=deal.id) }}" enctype="multipart/form-data">
+            {{ ui.csrf_field() }}
+            <input type="hidden" name="action" value="release">
+            <input type="hidden" name="next" value="{{ url_for('portal.deal_detail', deal_id=deal.id) }}">
+            <label class="label" for="fiat_reference">Bank reference</label>
+            <input class="input" id="fiat_reference" name="fiat_reference" placeholder="NIP / RTGS reference" required style="margin:6px 0 10px">
+            <label class="label" for="receipt">Proof of payment</label>
+            <input class="input" id="receipt" name="receipt" type="file" accept=".png,.jpg,.jpeg,.webp,.pdf" style="margin:6px 0 10px;padding:7px">
+            <button class="btn btn-primary btn-block" type="submit">{{ ui.icon('bank') }} Release NGN</button>
+          </form>
+          {% endif %}
+
+          {% if deal.status == 'FIAT_SENT' %}
+          <form method="post" action="{{ url_for('admin.deal_action', deal_id=deal.id) }}">
+            {{ ui.csrf_field() }}
+            <input type="hidden" name="action" value="settle">
+            <input type="hidden" name="next" value="{{ url_for('portal.deal_detail', deal_id=deal.id) }}">
+            <button class="btn btn-primary btn-block" type="submit">{{ ui.icon('check') }} Mark settled</button>
+          </form>
+          {% endif %}
+
+          {% if deal.status in ('AWAITING_DEPOSIT', 'CRYPTO_PENDING', 'AGREED') %}
+          <form method="post" action="{{ url_for('admin.deal_action', deal_id=deal.id) }}">
+            {{ ui.csrf_field() }}
+            <input type="hidden" name="action" value="recheck">
+            <input type="hidden" name="next" value="{{ url_for('portal.deal_detail', deal_id=deal.id) }}">
+            <label class="label" for="recheck-txid">Re-check txid</label>
+            <input class="input mono" id="recheck-txid" name="txid" value="{{ deal.txid or '' }}" placeholder="txid" style="margin:6px 0 10px;font-size:12px">
+            <button class="btn btn-block" type="submit">{{ ui.icon('shield') }} Run verification</button>
+          </form>
+          {% endif %}
+
+          {% if deal.status not in ('SETTLED', 'REJECTED') %}
+          <form method="post" action="{{ url_for('admin.deal_action', deal_id=deal.id) }}">
+            {{ ui.csrf_field() }}
+            <input type="hidden" name="action" value="reject">
+            <input type="hidden" name="next" value="{{ url_for('portal.deal_detail', deal_id=deal.id) }}">
+            <input class="input" name="reason" placeholder="Reason (optional)" style="margin-bottom:10px">
+            <button class="btn btn-danger btn-block" type="submit">{{ ui.icon('x') }} Reject deal</button>
+          </form>
+          {% endif %}
+
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    <p class="tiny mute">
+      Every state change on this file is written to the audit log with actor, timestamp and IP.
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block content %}
+<form method="post" action="{{ url_for('portal.deal_new') }}" id="deal-form">
+  {{ ui.csrf_field() }}
+
+  <div class="split">
+    <div class="stack">
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Terms</div>
+            <div class="card-sub">What is being settled, and at what level</div>
+          </div>
+          <span class="tag">Step 1 of 4</span>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label class="label" for="network">Network</label>
+              <select class="select" id="network" name="network" required>
+                {% for key, meta in networks.items() %}
+                  <option value="{{ key }}" data-asset="{{ meta.asset }}"
+                          data-rate="{{ rates.get(meta.asset, 0) }}"
+                          data-conf="{{ meta.required_conf }}"
+                          data-hint="{{ meta.address_hint }}">
+                    {{ meta.label }} · {{ meta.required_conf }} confirmations
+                  </option>
+                {% endfor %}
+              </select>
+              <span class="hint" id="network-hint">Deposit addresses use the format bc1… / 1… / 3…</span>
+            </div>
+
+            <div class="field">
+              <label class="label" for="amount_crypto">Amount</label>
+              <div class="input-affix">
+                <input class="input num" id="amount_crypto" name="amount_crypto" inputmode="decimal"
+                       placeholder="0.00" required value="{{ request.form.get('amount_crypto', '') }}">
+                <span class="affix" id="asset-affix">BTC</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label" for="rate_ngn">Rate (NGN per unit)</label>
+              <div class="input-affix">
+                <input class="input num" id="rate_ngn" name="rate_ngn" inputmode="decimal"
+                       placeholder="0.00" required
+                       value="{{ request.form.get('rate_ngn') or rates.get('BTC', '') }}">
+                <span class="affix">NGN</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label" for="counterparty_id">Counterparty</label>
+              <select class="select" id="counterparty_id" name="counterparty_id">
+                <option value="">Desk principal (no second client)</option>
+                {% for c in counterparties %}
+                  <option value="{{ c.id }}">{{ c.company or c.full_name }} — KYC {{ c.kyc_status }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="field">
+              <label class="label" for="fiat_method">NGN settlement method</label>
+              <select class="select" id="fiat_method" name="fiat_method">
+                {% for key, label in fiat_methods.items() %}
+                  <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Payout details</div>
+            <div class="card-sub">Where the NGN leg lands</div>
+          </div>
+          <span class="tag">Step 2 of 4</span>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="field span-2">
+              <label class="label" for="payout_bank">Bank instructions</label>
+              <input class="input" id="payout_bank" name="payout_bank"
+                     placeholder="Bank · account number · beneficiary name"
+                     value="{{ request.form.get('payout_bank', '') }}">
+              <span class="hint">Free text for the POC — production should use validated payout accounts.</span>
+            </div>
+
+            <div class="field span-2">
+              <label class="label" for="payout_address">Payout wallet (optional)</label>
+              <input class="input mono" id="payout_address" name="payout_address" list="wallet-list"
+                     placeholder="Whitelisted address, if the crypto leg pays out to you"
+                     value="{{ request.form.get('payout_address', '') }}">
+              <datalist id="wallet-list">
+                {% for w in wallets %}
+                  <option value="{{ w.address }}">{{ w.label or w.network }}</option>
+                {% endfor %}
+              </datalist>
+              {% if not wallets %}
+                <span class="hint">No whitelisted wallet yet — you can add one under Wallets.</span>
+              {% endif %}
+            </div>
+
+            <div class="field span-2">
+              <label class="label" for="notes">Deal note</label>
+              <textarea class="textarea" id="notes" name="notes"
+                        placeholder="Context for the desk: cut-off time, rail, partial fills…">{{ request.form.get('notes', '') }}</textarea>
+            </div>
+          </div>
+        </div>
+        <div class="card-foot">
+          <span>Deals are reviewed by both counterparties before instructions are issued.</span>
+          <button class="btn btn-primary" type="submit">{{ ui.icon('send') }} Create deal</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="stack">
+      <section class="card">
+        <div class="card-head">
+          <div class="card-title">Indicative summary</div>
+          <span class="chip" id="summary-asset">BTC</span>
+        </div>
+        <div class="card-body">
+          <div class="kv">
+            <div class="kv-row"><dt>Crypto leg</dt><dd id="sum-crypto">—</dd></div>
+            <div class="kv-row"><dt>Rate</dt><dd id="sum-rate">—</dd></div>
+            <div class="kv-sep"></div>
+            <div class="kv-row"><dt>Gross NGN</dt><dd id="sum-gross" class="strong">—</dd></div>
+            <div class="kv-row"><dt>Desk fee (0.60 %)</dt><dd id="sum-fee">—</dd></div>
+            <div class="kv-row"><dt>Net to counterparty</dt><dd id="sum-net" class="strong">—</dd></div>
+            <div class="kv-sep"></div>
+            <div class="kv-row"><dt>Confirmations</dt><dd id="sum-conf">—</dd></div>
+          </div>
+        </div>
+        <div class="card-foot">
+          <span class="tiny">Figures follow the desk's calculation, not a market feed.</span>
+        </div>
+      </section>
+
+      <div class="banner banner-info">
+        {{ ui.icon('shield') }}
+        <div>
+          <strong>No fiat before the chain.</strong>
+          The desk cannot mark the NGN leg as sent until the deposit is confirmed at depth.
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

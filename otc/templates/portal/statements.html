@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block topbar_actions %}
+  <a class="btn btn-sm" href="{{ url_for('portal.statements_csv') }}">{{ ui.icon('download') }} CSV</a>
+  <a class="btn btn-sm btn-ghost" href="#" onclick="window.print();return false;">{{ ui.icon('printer') }} Print</a>
+{% endblock %}
+
+{% block content %}
+<div class="kpi-grid">
+  <div class="kpi" data-tone="gold">
+    <div class="kpi-label">Settled notional</div>
+    <div class="kpi-value">{{ total_ngn | ngn }}</div>
+    <div class="kpi-foot">All released fiat legs</div>
+  </div>
+  {% for asset, b in by_asset.items() %}
+  <div class="kpi">
+    <div class="kpi-label">{{ asset }} volume</div>
+    <div class="kpi-value small-value">{{ b.crypto | crypto(asset) }}</div>
+    <div class="kpi-foot">{{ b.count }} deal{{ 's' if b.count != 1 }} · {{ b.ngn | ngn }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<section class="card mt-3">
+  <div class="card-head">
+    <div>
+      <div class="card-title">Settled activity</div>
+      <div class="card-sub">Signed counterparty statement — all times UTC</div>
+    </div>
+    <span class="chip">{{ deals | length }} record{{ 's' if deals | length != 1 }}</span>
+  </div>
+
+  {% if deals %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Deal</th><th>Settled</th><th>Asset</th><th class="right">Crypto</th>
+            <th class="right">Rate</th><th class="right">NGN</th><th class="right">Fee</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for d in deals %}
+        <tr>
+          <td><a class="ref" href="{{ url_for('portal.deal_detail', deal_id=d.id) }}">{{ d.ref }}</a></td>
+          <td class="small mute nowrap">{{ (d.settled_at or d.updated_at) | dt('%d %b %Y') }}</td>
+          <td class="small strong">{{ d.asset }}<span class="sub">{{ networks[d.network].short }}</span></td>
+          <td class="right amount">{{ d.amount_crypto | crypto(d.asset) }}</td>
+          <td class="right small dim num">{{ '{:,.2f}'.format(d.rate_ngn) }}</td>
+          <td class="right amount">{{ d.fiat_amount | ngn }}</td>
+          <td class="right small dim">{{ d.fee_ngn | ngn }}</td>
+          <td class="right">
+            {% if d.fiat_reference %}
+              <a class="icon-btn" href="{{ url_for('portal.deal_receipt', deal_id=d.id) }}" title="Settlement receipt">{{ ui.icon('file') }}</a>
+            {% else %}
+              <span class="tiny mute">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-foot">
+    <span>Net of desk fees · generated {{ deals[0].updated_at | dt('%d %b %Y · %H:%M') if deals else '—' }} UTC</span>
+    <span class="mono tiny">{{ brand }} · {{ env_name }}</span>
+  </div>
+  {% else %}
+    {{ ui.empty_state('No settled deals', 'Once a deal closes it appears here and in your CSV export.', 'file') }}
+  {% endif %}
+</section>
+{% endblock %}

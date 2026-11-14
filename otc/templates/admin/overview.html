@@ -1,0 +1,158 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block topbar_actions %}
+  <a class="btn btn-sm" href="{{ url_for('admin.queue') }}">{{ ui.icon('layers') }} Queue
+    {% if admin_queue_count %}<span class="badge" data-tone="warn">{{ admin_queue_count }}</span>{% endif %}
+  </a>
+  <a class="btn btn-sm btn-primary" href="{{ url_for('admin.verify') }}">{{ ui.icon('shield') }} Verify</a>
+{% endblock %}
+
+{% block content %}
+<div class="kpi-grid">
+  <div class="kpi" data-tone="gold">
+    <div class="kpi-label">Volume · 30d</div>
+    <div class="kpi-value">{{ volume_30d | ngn }}</div>
+    <div class="kpi-foot">{{ settled_count }} deals settled all-time</div>
+  </div>
+  <div class="kpi" data-tone="teal">
+    <div class="kpi-label">Desk P&amp;L · 30d</div>
+    <div class="kpi-value">{{ fees_30d | ngn }}</div>
+    <div class="kpi-foot">Fees on settled notional</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Open exposure</div>
+    <div class="kpi-value">{{ exposure | ngn }}</div>
+    <div class="kpi-foot">Fiat committed, not yet settled</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Clients</div>
+    <div class="kpi-value">{{ clients_count }}</div>
+    <div class="kpi-foot">
+      {% if pending_kyc %}<span style="color:var(--gold-2)">{{ pending_kyc }} KYC pending</span>{% else %}All KYC verified{% endif %}
+      {% if pending_wallets %} · {{ pending_wallets }} wallet{{ 's' if pending_wallets != 1 }}{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="split mt-3">
+  <div class="stack">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Settled volume</div>
+          <div class="card-sub">Last 14 days, NGN released</div>
+        </div>
+        <span class="chip">{{ month_count }} deal{{ 's' if month_count != 1 }} opened this month</span>
+      </div>
+      <div class="card-body">
+        <div class="chart">
+          {% for c in chart %}
+            <div class="chart-bar" title="{{ c.day.strftime('%d %b') }} · {{ '₦{:,.0f}'.format(c.value) }}">
+              <div class="bar" style="height: {{ (c.value / peak * 100) | round(1) }}%"></div>
+              <span class="day">{{ c.day.strftime('%d/%m') }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Latest deals</div>
+          <div class="card-sub">Every counterparty, newest first</div>
+        </div>
+        <a class="btn btn-sm btn-ghost" href="{{ url_for('admin.queue') }}">Queue {{ ui.icon('chevron') }}</a>
+      </div>
+      {% if recent %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Deal</th><th>Client</th><th class="right">NGN</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for d in recent %}
+            <tr onclick="window.location='{{ url_for('portal.deal_detail', deal_id=d.id) }}'" style="cursor:pointer">
+              <td>
+                <span class="ref">{{ d.ref }}</span>
+                <span class="sub">{{ networks[d.network].short }} · {{ d.created_at | ago }}</span>
+              </td>
+              <td class="small tight-cell">{{ d.initiator.company or d.initiator.full_name }}</td>
+              <td class="right amount">{{ d.fiat_amount | ngn }}</td>
+              <td>{{ ui.badge(d.status) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {{ ui.empty_state('No deals yet', 'Seed the demo book or wait for the first client deal.', 'layers') }}
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Needs your signature</div>
+          <div class="card-sub">Deals waiting on a desk decision</div>
+        </div>
+      </div>
+      <div class="card-body tight">
+        {% if upcoming %}
+          <div class="stack" style="gap:12px">
+            {% for d in upcoming %}
+            <a class="row-between" href="{{ url_for('portal.deal_detail', deal_id=d.id) }}" style="gap:12px">
+              <div style="min-width:0">
+                <div class="small strong ref">{{ d.ref }}</div>
+                <div class="tiny mute truncate">{{ d.initiator.company or d.initiator.full_name }} · {{ d.asset }} {{ d.amount_crypto | crypto }}</div>
+              </div>
+              <div class="right">
+                {{ ui.badge(d.status) }}
+                <div class="tiny mute mt-1">{{ d.updated_at | ago }}</div>
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="small mute" style="padding:6px 0">Queue is clear. Nothing waiting on the desk.</p>
+        {% endif %}
+      </div>
+      {% if disputes %}
+      <div class="card-foot">
+        <span style="color:var(--red)">{{ disputes }} open dispute{{ 's' if disputes != 1 }}</span>
+        <a class="link small" href="{{ url_for('admin.queue', tab='disputes') }}">Review</a>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Reference rates</div>
+          <div class="card-sub">Used as the default when a client opens a deal</div>
+        </div>
+      </div>
+      <form class="card-body" method="post" action="{{ url_for('admin.rates_update') }}">
+        {{ ui.csrf_field() }}
+        <div class="stack">
+          {% for asset in ['BTC', 'USDT'] %}
+          <div class="field">
+            <label class="label" for="rate_{{ asset }}">{{ asset }} / NGN</label>
+            <div class="input-affix">
+              <input class="input num" id="rate_{{ asset }}" name="rate_{{ asset }}"
+                     value="{{ rates.get(asset).ngn_rate if rates.get(asset) else '' }}" inputmode="decimal">
+              <span class="affix">NGN</span>
+            </div>
+            {% if rates.get(asset) %}
+              <span class="hint">updated {{ rates.get(asset).updated_at | ago }}</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+          <button class="btn btn-block" type="submit">Save rates</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}

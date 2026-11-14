@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+
+{% block title %}{{ code }} · {{ brand }}{% endblock %}
+
+{% block body %}
+<div class="auth" style="grid-template-columns:1fr">
+  <main class="auth-main" style="min-height:100vh">
+    <div class="auth-card" style="max-width:460px;text-align:center">
+      <div class="brand-mark" style="margin:0 auto 18px;width:46px;height:46px">{{ ui.icon('alert') }}</div>
+      <p class="kicker">Error {{ code }}</p>
+      <h1>{{ 'Access denied' if code == 403 else ('Not found' if code == 404 else 'Request rejected') }}</h1>
+      <p class="sub">{{ message }}</p>
+      <div class="row" style="justify-content:center;gap:10px;margin-top:24px">
+        <a class="btn" href="{{ url_for('home') }}">Back to the desk</a>
+        {% if not current_user.is_authenticated %}
+          <a class="btn btn-primary" href="{{ url_for('auth.login') }}">Sign in</a>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

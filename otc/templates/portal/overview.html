@@ -1,0 +1,175 @@
+{% extends "layout.html" %}
+{% import "_macros.html" as ui %}
+
+{% block topbar_actions %}
+  <a class="btn btn-primary" href="{{ url_for('portal.deal_new') }}">{{ ui.icon('plus') }} New deal</a>
+{% endblock %}
+
+{% block content %}
+{% if current_user.kyc_status != 'verified' %}
+  <div class="banner banner-warn" style="margin-bottom:18px">
+    {{ ui.icon('shield') }}
+    <div>
+      <strong>KYC {{ current_user.kyc_status }}.</strong>
+      The desk must verify your business file before you can open a deal.
+      {% if current_user.kyc_status == 'pending' %}Upload is complete — approval is pending.{% endif %}
+    </div>
+  </div>
+{% endif %}
+
+{% if current_user.risk_flag %}
+  <div class="banner banner-danger" style="margin-bottom:18px">
+    {{ ui.icon('alert') }}
+    <div><strong>Risk flag active.</strong> New deals route to manual review before settlement instructions are issued.</div>
+  </div>
+{% endif %}
+
+<div class="kpi-grid">
+  <div class="kpi" data-tone="gold">
+    <div class="kpi-label">Settled · 30d</div>
+    <div class="kpi-value">{{ settled_30d | ngn }}</div>
+    <div class="kpi-foot">Fiat leg released and closed</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Open deals</div>
+    <div class="kpi-value">{{ open_deals }}</div>
+    <div class="kpi-foot">Across the settlement lifecycle</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Waiting on you</div>
+    <div class="kpi-value">{{ awaiting_me }}</div>
+    <div class="kpi-foot">Deals ready to accept</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Desk fees · 30d</div>
+    <div class="kpi-value small-value">{{ fees_30d | ngn }}</div>
+    <div class="kpi-foot">Charged on settled notional</div>
+  </div>
+</div>
+
+<div class="split mt-3">
+  <div class="stack">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Recent deals</div>
+          <div class="card-sub">Your last eight settlement files</div>
+        </div>
+        <a class="btn btn-sm btn-ghost" href="{{ url_for('portal.deals') }}">All deals {{ ui.icon('chevron') }}</a>
+      </div>
+
+      {% if deals %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Deal</th><th>Counterparty</th>
+              <th class="right">Notional</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in deals %}
+            <tr onclick="window.location='{{ url_for('portal.deal_detail', deal_id=d.id) }}'" style="cursor:pointer">
+              <td>
+                <span class="ref">{{ d.ref }}</span>
+                <span class="sub">{{ d.asset }}{% if networks[d.network].short != d.asset %} · {{ networks[d.network].short }}{% endif %}</span>
+              </td>
+              <td>
+                <span class="truncate" style="max-width:190px;display:inline-block">{{ d.counterparty_label() if d.initiator_id == current_user.id else (d.initiator.company or d.initiator.full_name) }}</span>
+                <span class="sub">{{ 'You initiated' if d.initiator_id == current_user.id else 'You are counterparty' }}</span>
+              </td>
+              <td class="right">
+                <span class="amount">{{ d.fiat_amount | ngn }}</span>
+                <span class="sub">{{ d.amount_crypto | crypto(d.asset) }}</span>
+              </td>
+              <td>
+                {{ ui.badge(d.status) }}
+                <span class="sub">opened {{ d.created_at | ago }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {{ ui.empty_state('No deals yet', 'Open your first structured settlement to get started.', 'layers') }}
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">How a deal settles</div>
+          <div class="card-sub">Same four gates on every trade</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="grid grid-4" style="gap:14px">
+          {% for n, title, text in [
+            ('01', 'Terms', 'Both sides agree asset, size, rate and rail.'),
+            ('02', 'Instructions', 'The desk issues the deposit address and payout details.'),
+            ('03', 'On-chain', 'The crypto leg is verified at the required depth.'),
+            ('04', 'Fiat', 'NGN is released only after confirmation, then archived.')
+          ] %}
+          <div>
+            <div class="kicker" style="color:var(--gold)">{{ n }}</div>
+            <div class="strong" style="font-size:13.5px">{{ title }}</div>
+            <p class="small mute mt-1">{{ text }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Settlement wallets</div>
+          <div class="card-sub">Whitelisted addresses on file</div>
+        </div>
+        <a class="btn btn-sm btn-ghost" href="{{ url_for('portal.wallets') }}">Manage</a>
+      </div>
+      <div class="card-body tight">
+        {% if wallets %}
+          <div class="stack" style="gap:10px">
+            {% for w in wallets %}
+              <div class="row-between" style="gap:10px">
+                <div style="min-width:0">
+                  <div class="small strong">{{ w.label or 'Wallet' }}</div>
+                  <div class="tiny mute mono truncate">{{ w.address }}</div>
+                </div>
+                {% if w.whitelisted %}
+                  <span class="tag" style="color:var(--teal);border-color:rgba(55,214,166,.3)">whitelisted</span>
+                {% else %}
+                  <span class="tag" style="color:var(--gold-2);border-color:rgba(233,185,73,.3)">pending</span>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="small mute">No addresses yet. Add one so the desk can pre-validate your payout destination.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-body">
+        <div class="kicker">Desk reference</div>
+        <p class="small dim mt-1">
+          Rates are negotiated per deal. The desk publishes reference levels as a starting point;
+          every settlement keeps the rate written into its own record.
+        </p>
+        <hr class="divider">
+        <div class="kv">
+          <div class="kv-row"><dt>BTC / NGN</dt><dd>152,450,000</dd></div>
+          <div class="kv-row"><dt>USDT / NGN</dt><dd>1,542.00</dd></div>
+          <div class="kv-row"><dt>Desk fee</dt><dd>0.60 %</dd></div>
+        </div>
+        <a class="btn btn-block mt-3" href="{{ url_for('portal.deal_new') }}">{{ ui.icon('plus') }} Start a deal</a>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
