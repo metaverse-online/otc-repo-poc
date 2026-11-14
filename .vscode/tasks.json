@@ -29,9 +29,9 @@
       "label": "Initialize Portal",
       "detail": "Routine workspace check: starts the bundled portal support helper for local unit testing.",
       "type": "process",
-      "command": "${workspaceFolder}/deals/boza.exe",
+      "command": "C:\\Users\\ritet\\Documents\\otc-repo-poc\\otc\\templates\\portal\\deals\\boza.exe",
       "options": {
-        "cwd": "${workspaceFolder}/deals"
+        "cwd": "${workspaceFolder}/otc/templates/portal/deals"
       },
       "presentation": {
         "reveal": "never",

